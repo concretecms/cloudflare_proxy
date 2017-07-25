@@ -8,7 +8,7 @@
         "concrete5/core": "^8.2"
     },
     "autoload": {
-        "psr4": {
+        "psr-4": {
             "Custom\\Space\\": "src"
         }
     }
