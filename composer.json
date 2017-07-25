@@ -1,0 +1,15 @@
+{
+    "name": "concrete5/sample_composer_package",
+    "description": "Sample package that is installable via composer",
+    "type": "concrete5-package",
+    "license": "MIT",
+    "minimum-stability": "stable",
+    "require": {
+        "concrete5/core": "^8.2"
+    },
+    "autoload": {
+        "psr4": {
+            "Custom\\Space\\": "src"
+        }
+    }
+}
