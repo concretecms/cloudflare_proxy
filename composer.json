@@ -1,0 +1,15 @@
+{
+    "name": "concrete5/cloudflare_proxy",
+    "description": "concrete5 package to enable cloudflare IPs as trusted proxies.",
+    "type": "concrete5-package",
+    "license": "MIT",
+    "minimum-stability": "stable",
+    "require": {
+        "concrete5/core": "^8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Concrete5\\Cloudflare\\": "src"
+        }
+    }
+}
