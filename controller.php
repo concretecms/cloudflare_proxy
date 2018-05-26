@@ -21,7 +21,7 @@ class Controller extends Package
         $this->forceAutoload();
 
         // Add our service provider
-        $provider = new CloudflareServiceProvider($this->app);
+        $provider = $this->app->make(CloudflareServiceProvider::class);
         $provider->register();
     }
 

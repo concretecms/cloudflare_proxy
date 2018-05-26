@@ -3,13 +3,21 @@
     "description": "concrete5 package to enable cloudflare IPs as trusted proxies.",
     "type": "concrete5-package",
     "license": "MIT",
-    "minimum-stability": "stable",
-    "require": {
-        "concrete5/core": "^8.2"
+    "conflict": {
+        "concrete5/core": "<8.2",
+        "concrete5/concrete5": "<8.2"
+    },
+    "require-dev": {
+        "concrete5/core": "^8.2",
+        "phpunit/phpunit": "^7.1"
     },
     "autoload": {
         "psr-4": {
-            "Concrete5\\Cloudflare\\": "src"
+            "Concrete5\\Cloudflare\\": "src",
+            "Concrete5\\Cloudflare\\Tests\\": "tests"
         }
+    },
+    "scripts": {
+        "test": "phpunit"
     }
 }
