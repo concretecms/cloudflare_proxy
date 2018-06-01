@@ -27,6 +27,13 @@ final class CloudflareUpdateCommand extends Command
     const RETURN_CODE_ON_FAILURE = 2;
 
     /**
+     * {@inheritdoc}
+     *
+     * @see \Concrete\Core\Console\Command::$canRunAsRoot
+     */
+    protected $canRunAsRoot = false;
+
+    /**
      * @var \Concrete5\Cloudflare\CloudflareUpdater
      */
     protected $updater;
