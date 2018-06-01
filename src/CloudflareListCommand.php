@@ -2,18 +2,20 @@
 
 namespace Concrete5\Cloudflare;
 
-use Concrete\Core\Application\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 final class CloudflareListCommand extends Command
 {
-    protected $app;
+    /**
+     * @var CloudflareUpdater
+     */
+    protected $updater;
 
-    public function __construct(Application $app)
+    public function __construct(CloudflareUpdater $updater)
     {
-        $this->app = $app;
+        $this->updater = $updater;
         parent::__construct('cf:ip:list');
     }
 
@@ -28,14 +30,8 @@ final class CloudflareListCommand extends Command
      */
     public function run(InputInterface $input, OutputInterface $output)
     {
-        // Get the current IPs
-        $config = $this->app['config'];
-        if (!$ips = $config['cloudflare_proxy::ips.user']) {
-            $ips = $config['cloudflare_proxy::ips.default'];
-        }
-
         // Output the IPs
-        $output->writeln($ips);
+        $output->writeln($this->updater->getConfiguredIPs());
 
         // Return success status
         return 0;

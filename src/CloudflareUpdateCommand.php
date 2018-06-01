@@ -2,8 +2,8 @@
 
 namespace Concrete5\Cloudflare;
 
-use Concrete\Core\Application\Application;
-use Symfony\Component\Console\Command\Command;
+use Concrete\Core\Console\Command;
+use ReflectionClass;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -11,12 +11,56 @@ use Symfony\Component\Console\Question\ConfirmationQuestion;
 
 final class CloudflareUpdateCommand extends Command
 {
-    protected $app;
+    /**
+     * @var int
+     */
+    const RETURN_CODE_UPDATED = 0;
 
-    public function __construct(Application $app)
+    /**
+     * @var int
+     */
+    const RETURN_CODE_NOT_UPDATED = 1;
+
+    /**
+     * @var int
+     */
+    const RETURN_CODE_ON_FAILURE = 2;
+
+    /**
+     * @var \Concrete5\Cloudflare\CloudflareUpdater
+     */
+    protected $updater;
+
+    /**
+     * @param CloudflareUpdater $updater
+     */
+    public function __construct(CloudflareUpdater $updater)
     {
-        $this->app = $app;
+        $this->updater = $updater;
         parent::__construct('cf:ip:update');
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * @see \Symfony\Component\Console\Command\Command::configure()
+     */
+    protected function configure()
+    {
+        $constants = (new ReflectionClass($this))->getConstants();
+        $this->setName('cf:ip:update')
+            ->addOption('force', ['f', 'y'], InputOption::VALUE_NONE, 'Force the update')
+            ->addOption('quiet', 'q', InputOption::VALUE_NONE, 'Don\'t output')
+            ->setDescription(<<<EOT
+Update Cloudflare IPs.
+
+Exit codes:
+  - IP list updated: {$constants['RETURN_CODE_UPDATED']}
+  - IP list not updated: {$constants['RETURN_CODE_NOT_UPDATED']}
+  - errors: {$constants['RETURN_CODE_ON_FAILURE']}
+EOT
+            )
+        ;
     }
 
     /**
@@ -28,118 +72,83 @@ final class CloudflareUpdateCommand extends Command
      *
      * @return int
      */
-    public function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output)
     {
         if ($input->getOption('quiet')) {
             $output->setVerbosity($output::VERBOSITY_QUIET);
         }
 
-        $config = $this->app['config'];
-
-        // Get the configuration
-        $endpoints = $config['cloudflare_proxy::endpoints'];
-
-        // Get the old IPs
-        if (!$oldIps = $config['cloudflare_proxy::ips.user']) {
-            $oldIps = $config['cloudflare_proxy::ips.default'];
+        $newIPs = $this->updater->getCustomIPs();
+        $endpoints = $this->updater->getCloudfareEndpoints();
+        foreach ($endpoints as $endpoint) {
+            if ($endpoint) {
+                $output->writeln('Downloading IPs from ["' . $endpoint . '"]');
+            }
+            $newIPs = array_merge($newIPs, $this->updater->getCloudflareIPs([$endpoint]));
         }
 
-        // Get the new list of IPs
-        $ips = $this->getIps($endpoints, $output);
+        $oldIPs = $this->updater->getConfiguredIPs();
 
-        // If we should update, lets update
-        if ($this->shouldApplyChanges($input, $output, $ips, $oldIps)) {
-            $config->save('cloudflare_proxy::ips.user', $ips);
+        $state = new CloudflareUpdaterState($oldIPs, $newIPs);
 
-            // Return a success response
-            return 0;
+        if ($this->shouldApplyChanges($input, $output, $state)) {
+            $this->updater->setConfiguredIPs($newIPs);
+            $rc = static::RETURN_CODE_UPDATED;
+        } else {
+            $rc = static::RETURN_CODE_NOT_UPDATED;
         }
 
-        // Return a failure response
-        return 1;
-    }
-
-    protected function configure()
-    {
-        $this->setName('cf:ip:update')
-            ->setDescription('Update cloudflare IPs')
-            ->addOption('force', ['f', 'y'], InputOption::VALUE_NONE, 'Force the update')
-            ->addOption('quiet', 'q', InputOption::VALUE_NONE, 'Don\'t output');
+        return $rc;
     }
 
     /**
-     * Get the IPs from a url service.
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     * @param CloudflareUpdaterState $state
      *
-     * @param $urls
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
-     *
-     * @return array
+     * @return bool
      */
-    private function getIps($urls, OutputInterface $output)
+    private function shouldApplyChanges(InputInterface $input, OutputInterface $output, CloudflareUpdaterState $state)
     {
-        $ips = [];
-        foreach ($urls as $url) {
-            $output->writeln('Downloading IPs from ["' . $url . '"]');
-            if ($contents = file_get_contents($url)) {
-                $ips = array_merge($ips, explode(PHP_EOL, $contents));
+        $result = false;
+        $addedIPs = $state->getAddedIPs();
+        $removedIPs = $state->getRemovedIPs();
+        if (count($addedIPs) === 0 && count($removedIPs) === 0) {
+            // There is no difference between the two arrays
+            $output->writeln(sprintf('No changes detected to the %d currently configured IPs.', count($state->getOldIPs())));
+        } else {
+            if (count($addedIPs) > 0) {
+                $output->writeln(['', 'Adding IPs:']);
+                $output->writeln($this->indented($addedIPs));
+            }
+            if (count($removedIPs) > 0) {
+                $output->writeln(['', 'Removing IPs:']);
+                $output->writeln($this->indented($removedIPs));
+            }
+            // Output a general count of IPs
+            $output->writeln(['', 'Leaving us with ' . count($state->getNewIPs()) . ' IPs remaining.', '']);
+
+            // If the user has forced this to update
+            if ($input->getOption('force')) {
+                $result = true;
+            } elseif ($input->getOption('no-interaction')) {
+                $output->writeln('Changes NOT applied since we are not in interaction (use the --force option).');
+                $result = false;
+            } else {
+                // Confirm with the user
+                $question = new ConfirmationQuestion('Do you want to apply these changes? ', false);
+                $question->setAutocompleterValues(['yes', 'no']);
+                $result = (bool) $this->getHelper('question')->ask($input, $output, $question);
             }
         }
 
-        return array_filter($ips);
+        return $result;
     }
 
-    private function shouldApplyChanges(InputInterface $input, OutputInterface $output, array $ips, array $oldIps)
-    {
-        // There is no difference between the two arrays
-        if (!$ips) {
-            $output->writeln('No IPs were found.');
-
-            return false;
-        }
-
-        // Diff the old IP array with the new one
-        $addIps = array_diff($ips, $oldIps);
-        $removeIps = array_diff($oldIps, $ips);
-
-        // There is no difference between the two arrays
-        if (!$addIps && !$removeIps) {
-            $output->writeln('No changes detected.');
-
-            return true;
-        }
-
-        // If we have IP's being added
-        if ($addIps) {
-            $output->writeln(['', 'Adding IPs:']);
-            $output->writeln($this->indented($addIps));
-        }
-
-        // If we have IP's being removed
-        if ($removeIps) {
-            $output->writeln(['', 'Removing IPs:']);
-            $output->writeln($this->indented($removeIps));
-        }
-
-        // Output a general count of IPs
-        $output->writeln(['', 'Leaving us with ' . count($ips) . ' IPs remaining.', '']);
-
-        // If the user has forced this to update
-        if ($input->hasOption('force')) {
-            return true;
-        }
-
-        // Confirm with the user
-        $question = new ConfirmationQuestion('Do you want to apply these changes? ', false);
-        $question->setAutocompleterValues(['yes', 'no']);
-
-        /* @var \Symfony\Component\Console\Helper\QuestionHelper $questionHelper */
-        return (bool) $this->getHelper('question')->ask($input, $output, $question);
-    }
-
-    private function indented(array $data, $spaces = 4)
+    private function indented(array $data, $with = '    ')
     {
         foreach ($data as &$item) {
-            $item = str_repeat(' ', $spaces) . $item;
+            $item = $with . $item;
         }
 
         return $data;
