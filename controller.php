@@ -8,7 +8,6 @@ use Concrete5\Cloudflare\CloudflareServiceProvider;
 
 class Controller extends Package
 {
-
     protected $appVersionRequired = '8.2.0';
     protected $pkgVersion = '1.0.0';
     protected $pkgHandle = 'cloudflare_proxy';
@@ -26,7 +25,7 @@ class Controller extends Package
     }
 
     /**
-     * In the event that composer hasn't been included, register our own classloader
+     * In the event that composer hasn't been included, register our own classloader.
      */
     private function forceAutoload()
     {

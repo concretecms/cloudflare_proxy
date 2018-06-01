@@ -8,7 +8,6 @@ use Symfony\Component\HttpFoundation\Request;
 
 final class CloudflareServiceProvider extends Provider
 {
-
     /**
      * Registers the services provided by this provider.
      */
@@ -19,7 +18,7 @@ final class CloudflareServiceProvider extends Provider
     }
 
     /**
-     * Register known CloudFlare proxy IPs
+     * Register known CloudFlare proxy IPs.
      */
     private function registerProxy()
     {
@@ -34,7 +33,7 @@ final class CloudflareServiceProvider extends Provider
     /**
      * Register the commands
      * `concrete5 cf:ip:update`
-     * `concrete5 cf:ip:list`
+     * `concrete5 cf:ip:list`.
      */
     private function registerCommands()
     {
@@ -42,7 +41,7 @@ final class CloudflareServiceProvider extends Provider
         $this->app->extend('console', function (Application $console) use ($app) {
             $console->addCommands([
                 $app->make(CloudflareUpdateCommand::class),
-                $app->make(CloudflareListCommand::class)
+                $app->make(CloudflareListCommand::class),
             ]);
 
             return $console;

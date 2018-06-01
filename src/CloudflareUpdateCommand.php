@@ -4,7 +4,6 @@ namespace Concrete5\Cloudflare;
 
 use Concrete\Core\Application\Application;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -12,7 +11,6 @@ use Symfony\Component\Console\Question\ConfirmationQuestion;
 
 final class CloudflareUpdateCommand extends Command
 {
-
     protected $app;
 
     public function __construct(Application $app)
@@ -21,20 +19,13 @@ final class CloudflareUpdateCommand extends Command
         parent::__construct('cf:ip:update');
     }
 
-    protected function configure()
-    {
-        $this->setName('cf:ip:update')
-            ->setDescription('Update cloudflare IPs')
-            ->addOption('force', ['f', 'y'], InputOption::VALUE_NONE, 'Force the update')
-            ->addOption('quiet', 'q', InputOption::VALUE_NONE, 'Don\'t output');
-    }
-
     /**
      * `cf:ip:update` command
-     * Update IPs from the cloudflare's static endpoints
+     * Update IPs from the cloudflare's static endpoints.
      *
      * @param \Symfony\Component\Console\Input\InputInterface $input
      * @param \Symfony\Component\Console\Output\OutputInterface $output
+     *
      * @return int
      */
     public function execute(InputInterface $input, OutputInterface $output)
@@ -68,10 +59,20 @@ final class CloudflareUpdateCommand extends Command
         return 1;
     }
 
+    protected function configure()
+    {
+        $this->setName('cf:ip:update')
+            ->setDescription('Update cloudflare IPs')
+            ->addOption('force', ['f', 'y'], InputOption::VALUE_NONE, 'Force the update')
+            ->addOption('quiet', 'q', InputOption::VALUE_NONE, 'Don\'t output');
+    }
+
     /**
-     * Get the IPs from a url service
+     * Get the IPs from a url service.
+     *
      * @param $urls
      * @param \Symfony\Component\Console\Output\OutputInterface $output
+     *
      * @return array
      */
     private function getIps($urls, OutputInterface $output)
@@ -92,6 +93,7 @@ final class CloudflareUpdateCommand extends Command
         // There is no difference between the two arrays
         if (!$ips) {
             $output->writeln('No IPs were found.');
+
             return false;
         }
 
@@ -102,6 +104,7 @@ final class CloudflareUpdateCommand extends Command
         // There is no difference between the two arrays
         if (!$addIps && !$removeIps) {
             $output->writeln('No changes detected.');
+
             return true;
         }
 
@@ -120,7 +123,6 @@ final class CloudflareUpdateCommand extends Command
         // Output a general count of IPs
         $output->writeln(['', 'Leaving us with ' . count($ips) . ' IPs remaining.', '']);
 
-
         // If the user has forced this to update
         if ($input->hasOption('force')) {
             return true;
@@ -130,8 +132,8 @@ final class CloudflareUpdateCommand extends Command
         $question = new ConfirmationQuestion('Do you want to apply these changes? ', false);
         $question->setAutocompleterValues(['yes', 'no']);
 
-        /** @var \Symfony\Component\Console\Helper\QuestionHelper $questionHelper */
-        return (bool)$this->getHelper('question')->ask($input, $output, $question);
+        /* @var \Symfony\Component\Console\Helper\QuestionHelper $questionHelper */
+        return (bool) $this->getHelper('question')->ask($input, $output, $question);
     }
 
     private function indented(array $data, $spaces = 4)
@@ -142,5 +144,4 @@ final class CloudflareUpdateCommand extends Command
 
         return $data;
     }
-
 }
