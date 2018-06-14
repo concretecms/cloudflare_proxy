@@ -2,39 +2,78 @@
 
 namespace Concrete\Package\CloudflareProxy;
 
-use Concrete\Core\Foundation\Psr4ClassLoader;
+use Concrete\Core\Console\Application as ConsoleApplication;
+use Concrete\Core\Database\EntityManager\Provider\ProviderInterface;
 use Concrete\Core\Package\Package;
-use Concrete5\Cloudflare\CloudflareServiceProvider;
+use Concrete5\Cloudflare\CloudflareListCommand;
+use Concrete5\Cloudflare\CloudflareUpdateCommand;
 
-class Controller extends Package
+class Controller extends Package implements ProviderInterface
 {
+    protected $pkgHandle = 'cloudflare_proxy';
+
+    protected $pkgVersion = '2.0.0';
 
     protected $appVersionRequired = '8.2.0';
-    protected $pkgVersion = '1.0.0';
-    protected $pkgHandle = 'cloudflare_proxy';
-    protected $pkgName = 'CloudFlare IP Proxy';
-    protected $pkgDescription = 'A package that configures your concrete5 site to work with cloudflare';
 
-    public function on_start()
+    protected $pkgAutoloaderRegistries = [
+        'src' => 'Concrete5\\Cloudflare',
+    ];
+
+    public function getPackageName()
     {
-        // Make sure that we are registered to autoload
-        $this->forceAutoload();
+        return t('CloudFlare IP Proxy');
+    }
 
-        // Add our service provider
-        $provider = new CloudflareServiceProvider($this->app);
-        $provider->register();
+    public function getPackageDescription()
+    {
+        return t('A package that configures your concrete5 site to work with cloudflare');
     }
 
     /**
-     * In the event that composer hasn't been included, register our own classloader
+     * {@inheritdoc}
+     *
+     * @see \Concrete\Core\Database\EntityManager\Provider\ProviderInterface::getDrivers()
      */
-    private function forceAutoload()
+    public function getDrivers()
     {
-        // If we're not included with composer, add our autoloader manually
-        if (!class_exists(CloudflareServiceProvider::class)) {
-            $autoload = new Psr4ClassLoader();
-            $autoload->addPrefix('Concrete5\\Cloudflare', __DIR__ . '/src');
-            $autoload->register();
+        return [];
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * @see \Concrete\Core\Package\Package::install()
+     */
+    public function install()
+    {
+        parent::install();
+        $this->installContentFile('install.xml');
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * @see \Concrete\Core\Package\Package::install()
+     */
+    public function upgrade()
+    {
+        parent::upgrade();
+        $this->installContentFile('install.xml');
+    }
+
+    public function on_start()
+    {
+        if ($this->app->isRunThroughCommandLineInterface()) {
+            $app = $this->app;
+            $this->app->extend('console', function (ConsoleApplication $console) use ($app) {
+                $console->addCommands([
+                    $app->build(CloudflareListCommand::class),
+                    $app->build(CloudflareUpdateCommand::class),
+                ]);
+
+                return $console;
+            });
         }
     }
 }

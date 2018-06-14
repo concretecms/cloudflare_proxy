@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<concrete5-cif version="1.0">
+
+    <jobs>
+        <job package="cloudflare_proxy" handle="update_cloudflare_ips" />
+    </jobs>
+
+</concrete5-cif>
