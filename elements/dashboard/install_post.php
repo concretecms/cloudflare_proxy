@@ -14,7 +14,7 @@ if ($page && !$page->isError()) {
     }
 }
 ?>
-<p><?= t('The package has been installed, but the list of Cloudfare IP addresses is not yet configured.') ?></p>
+<p><?= t('The package has been installed, but the list of Cloudflare IP addresses is not yet configured.') ?></p>
 <p><?= t(
     'To configure it, please run the %s CLI command, or the %s authomated job.',
     '<code>cf:ip:update</code>',

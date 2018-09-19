@@ -1,7 +1,9 @@
 <?php
 
-/** Additional IPs to be trusted in addition to the Cloudflare ones */
 return [
-    'custom' => [
+    'cloudflare' => [
+        // Previously fetched Cloudflare IPs
+        'previous' => [
+        ],
     ],
 ];
