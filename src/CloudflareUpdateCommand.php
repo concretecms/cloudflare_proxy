@@ -55,12 +55,12 @@ final class CloudflareUpdateCommand extends Command
     protected function configure()
     {
         $constants = (new ReflectionClass($this))->getConstants();
-        $this->setName('cf:ip:update')
+        $this
+            ->setDescription('Update Cloudflare IPs')
+
             ->addOption('force', ['f', 'y'], InputOption::VALUE_NONE, 'Force the update')
             ->addOption('quiet', 'q', InputOption::VALUE_NONE, 'Don\'t output')
-            ->setDescription(<<<EOT
-Update Cloudflare IPs.
-
+            ->setHelp(<<<EOT
 Exit codes:
   - IP list updated: {$constants['RETURN_CODE_UPDATED']}
   - IP list not updated: {$constants['RETURN_CODE_NOT_UPDATED']}
@@ -71,13 +71,9 @@ EOT
     }
 
     /**
-     * `cf:ip:update` command
-     * Update IPs from the cloudflare's static endpoints.
+     * {@inheritdoc}
      *
-     * @param \Symfony\Component\Console\Input\InputInterface $input
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
-     *
-     * @return int
+     * @see \Concrete\Core\Console\Command::execute()
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
@@ -85,21 +81,18 @@ EOT
             $output->setVerbosity($output::VERBOSITY_QUIET);
         }
 
-        $newIPs = $this->updater->getCustomIPs();
-        $endpoints = $this->updater->getCloudfareEndpoints();
-        foreach ($endpoints as $endpoint) {
-            if ($endpoint) {
-                $output->writeln('Downloading IPs from ["' . $endpoint . '"]');
-            }
-            $newIPs = array_merge($newIPs, $this->updater->getCloudflareIPs([$endpoint]));
-        }
-
-        $oldIPs = $this->updater->getConfiguredIPs();
-
-        $state = new CloudflareUpdaterState($oldIPs, $newIPs);
+        $newCloudflareIPs = $this->fetchNewCloudflareIPs($output);
+        $initialTrustedIPs = $this->updater->getTrustedIPs();
+        $oldCloudflareIPs = $this->updater->getPreviousCloudflareIPs();
+        $customIPs = array_diff($initialTrustedIPs, $oldCloudflareIPs);
+        $finalTrustedIPs = array_values(array_unique(array_merge($customIPs, $newCloudflareIPs)));
+        $state = new CloudflareUpdaterState($initialTrustedIPs, $finalTrustedIPs);
 
         if ($this->shouldApplyChanges($input, $output, $state)) {
-            $this->updater->setConfiguredIPs($newIPs);
+            $this->updater
+                ->setTrustedIPs($finalTrustedIPs)
+                ->setPreviousCloudflareIPs($newCloudflareIPs)
+            ;
             $rc = static::RETURN_CODE_UPDATED;
         } else {
             $rc = static::RETURN_CODE_NOT_UPDATED;
@@ -109,9 +102,25 @@ EOT
     }
 
     /**
-     * @param InputInterface $input
-     * @param OutputInterface $output
-     * @param CloudflareUpdaterState $state
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     *
+     * @return string
+     */
+    private function fetchNewCloudflareIPs(OutputInterface $output)
+    {
+        $result = [];
+        foreach ($this->updater->getCloudflareEndpoints() as $endpoint) {
+            $output->writeln("Downloading IPs from {$endpoint}");
+            $result = array_merge($result, $this->updater->fetchNewCloudflareIPFromEndpoint($endpoint));
+        }
+
+        return array_values(array_unique($result));
+    }
+
+    /**
+     * @param \Symfony\Component\Console\Input\InputInterface $input
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     * @param \Concrete5\Cloudflare\CloudflareUpdaterState $state
      *
      * @return bool
      */
@@ -120,15 +129,14 @@ EOT
         $result = false;
         $addedIPs = $state->getAddedIPs();
         $removedIPs = $state->getRemovedIPs();
-        if (count($addedIPs) === 0 && count($removedIPs) === 0) {
-            // There is no difference between the two arrays
+        if ($addedIPs === [] && $removedIPs === []) {
             $output->writeln(sprintf('No changes detected to the %d currently configured IPs.', count($state->getOldIPs())));
         } else {
-            if (count($addedIPs) > 0) {
+            if ($addedIPs !== []) {
                 $output->writeln(['', 'Adding IPs:']);
                 $output->writeln($this->indented($addedIPs));
             }
-            if (count($removedIPs) > 0) {
+            if ($removedIPs !== []) {
                 $output->writeln(['', 'Removing IPs:']);
                 $output->writeln($this->indented($removedIPs));
             }
@@ -152,6 +160,12 @@ EOT
         return $result;
     }
 
+    /**
+     * @param string[] $data
+     * @param string $with
+     *
+     * @return string
+     */
     private function indented(array $data, $with = '    ')
     {
         foreach ($data as &$item) {

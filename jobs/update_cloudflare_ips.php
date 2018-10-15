@@ -38,13 +38,20 @@ class UpdateCloudflareIps extends AbstractJob
     {
         $app = Application::getFacadeApplication();
         $updater = $app->make(CloudflareUpdater::class);
-        $oldIPs = $updater->getConfiguredIPs();
-        $newIPs = array_merge($updater->getCustomIPs(), $updater->getCloudflareIPs($updater->getCloudfareEndpoints()));
-        $state = new CloudflareUpdaterState($oldIPs, $newIPs);
+
+        $newCloudflareIPs = $updater->fetchNewCloudflareIPs();
+        $initialTrustedIPs = $updater->getTrustedIPs();
+        $oldCloudflareIPs = $updater->getPreviousCloudflareIPs();
+        $customIPs = array_diff($initialTrustedIPs, $oldCloudflareIPs);
+        $finalTrustedIPs = array_values(array_unique(array_merge($customIPs, $newCloudflareIPs)));
+        $state = new CloudflareUpdaterState($initialTrustedIPs, $finalTrustedIPs);
         if ($state->getAddedIPs() === [] && $state->getRemovedIPs() === []) {
             $result = t('No changes to the %d IP addresses.', count($state->getOldIPs()));
         } else {
-            $updater->setConfiguredIPs($state->getNewIPs());
+            $updater
+                ->setTrustedIPs($state->getNewIPs())
+                ->setPreviousCloudflareIPs($newCloudflareIPs)
+            ;
             $lines = [];
             if ($state->getAddedIPs() !== []) {
                 $lines[] = t('IP addresses added: %d', count($state->getAddedIPs()));
@@ -53,7 +60,7 @@ class UpdateCloudflareIps extends AbstractJob
                 $lines[] = t('IP addresses removed: %d', count($state->getRemovedIPs()));
             }
             $lines[] = t('Resulting IP addresses: %d', count($state->getNewIPs()));
-            $result = implode("<br />", $lines);
+            $result = implode('<br />', $lines);
         }
 
         return $result;
