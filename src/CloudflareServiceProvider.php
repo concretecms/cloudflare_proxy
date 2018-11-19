@@ -24,11 +24,19 @@ final class CloudflareServiceProvider extends Provider
     private function registerProxy()
     {
         $config = $this->app->make('config');
+        
         if (!$ips = $config['cloudflare_proxy::ips.user']) {
             $ips = $config['cloudflare_proxy::ips.default'];
         }
+        
+        $ips = array_merge($ips, $config->get('concrete.security.trusted_proxies.ips', []));
 
-        Request::setTrustedProxies($ips);
+        // Handle different symfony versions
+        if (defined(SymphonyRequest::class . '::HEADER_X_FORWARDED_ALL')) {
+            Request::setTrustedProxies($ips, HEADER_X_FORWARDED_ALL);
+        } else {
+            Request::setTrustedProxies($ips);
+        }
     }
 
     /**
