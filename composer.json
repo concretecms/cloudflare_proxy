@@ -1,5 +1,5 @@
 {
-    "name": "concrete5/cloudflare_proxy",
+    "name": "concretecms/cloudflare_proxy",
     "description": "concrete5 package to enable cloudflare IPs as trusted proxies.",
     "type": "concrete5-package",
     "license": "MIT",
