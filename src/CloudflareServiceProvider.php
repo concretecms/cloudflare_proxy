@@ -32,8 +32,8 @@ final class CloudflareServiceProvider extends Provider
         $ips = array_merge($ips, $config->get('concrete.security.trusted_proxies.ips', []));
 
         // Handle different symfony versions
-        if (defined(SymphonyRequest::class . '::HEADER_X_FORWARDED_ALL')) {
-            Request::setTrustedProxies($ips, HEADER_X_FORWARDED_ALL);
+        if (defined(Request::class . '::HEADER_X_FORWARDED_ALL')) {
+            Request::setTrustedProxies($ips, Request::HEADER_X_FORWARDED_ALL);
         } else {
             Request::setTrustedProxies($ips);
         }
